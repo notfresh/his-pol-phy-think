@@ -102,13 +102,38 @@ img { max-width: 100%; margin: 3mm auto; display: block; }
 
 
 # ---------------------------------------------------------------- 解析索引
+# 列表行: - **042** · 2026-11-10 · [标题](路径) — 简介
+LIST_ROW_RE = re.compile(
+    r"^-\s*\*\*(\d{3})\*\*\s*·\s*([\d-]+)\s*·\s*\[([^\]]+)\]\(([^)]+)\)\s*—\s*(.+?)\s*$"
+)
+# 表格行(旧版): | 042 | 2026-11-10 | 简介 | [链接](路径) |
+TABLE_ROW_RE = re.compile(
+    r"^\|\s*(\d{3})\s*\|\s*([\d-]+)\s*\|\s*([^|]*?)\s*\|\s*\[([^\]]+)\]\(([^)]+)\)\s*\|"
+)
+
+
 def parse_index(repo: Path):
+    """解析 README 的内容索引 -> [{no, date, brief, path}, ...]
+
+    兼容两种行格式（新版 README 用列表，旧版用表格）：
+      - 列表: - **042** · 2026-11-10 · [标题](路径) — 简介
+      - 表格: | 042 | 2026-11-10 | 简介 | [链接](路径) |
+    """
     rows = []
-    for line in (repo / "README.md").read_text(encoding="utf-8").split("\n"):
-        m = re.match(
-            r"^\|\s*(\d{3})\s*\|\s*([\d-]+)\s*\|\s*([^|]*?)\s*\|\s*\[([^\]]+)\]\(([^)]+)\)\s*\|",
-            line,
-        )
+    text = (repo / "README.md").read_text(encoding="utf-8")
+    for line in text.split("\n"):
+        m = LIST_ROW_RE.match(line)
+        if m:
+            rows.append(
+                {
+                    "no": int(m.group(1)),
+                    "date": m.group(2),
+                    "brief": m.group(5),
+                    "path": m.group(4),
+                }
+            )
+            continue
+        m = TABLE_ROW_RE.match(line)
         if m:
             rows.append(
                 {
